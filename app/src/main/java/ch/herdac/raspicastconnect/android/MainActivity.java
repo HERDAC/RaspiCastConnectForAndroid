@@ -2,10 +2,8 @@ package ch.herdac.raspicastconnect.android;
 
 import android.Manifest;
 import android.app.Activity;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -16,7 +14,6 @@ import android.net.Uri;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiNetworkSpecifier;
-import android.net.wifi.p2p.WifiP2pManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
@@ -34,7 +31,6 @@ import com.jcraft.jsch.SftpException;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -46,6 +42,9 @@ public class MainActivity extends AppCompatActivity {
     private static final String wifiSSID = "HERDAC";
     private static final String wifiPWD = "hqum#wifi";
 
+    private boolean wifiWasEnabled = true;
+    private Integer networkId = null;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -56,6 +55,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendFileClick(View v) {
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        wifiWasEnabled = wifiManager.isWifiEnabled();
+        wifiManager.setWifiEnabled(true);
+
+        ConnectivityManager connectivityManager = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             WifiConfiguration config = new WifiConfiguration();
             config.SSID = wifiSSID;
@@ -66,17 +70,29 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-            wifiManager.addNetwork(config);
-            List<WifiConfiguration> list = wifiManager.getConfiguredNetworks();
-            for (WifiConfiguration i : list) {
-                if (i.SSID != null && i.SSID.equals("\"" + wifiSSID + "\"")) {
-                    wifiManager.disconnect();
-                    wifiManager.enableNetwork(i.networkId, true);
-                    wifiManager.reconnect();
-                    break;
-                }
+            Log.i("HERDAC-Wifi", "Network status (1): "+config.status);
+            networkId = wifiManager.addNetwork(config);
+            Log.i("HERDAC-Wifi", "Network ID (a): "+networkId);
+            Log.i("HERDAC-Wifi", "Network ID (b): "+config.networkId);
+
+            wifiManager.disconnect();
+            boolean activated = wifiManager.enableNetwork(networkId, true);
+            boolean connected = wifiManager.reconnect();
+            Log.i("HERDAC-Wifi", "Activated: "+activated);
+            Log.i("HERDAC-Wifi", "Connected: "+connected);
+
+            Network network = getNetwork(connectivityManager);
+            Log.i("HERDAC-Wifi", "Network status (2): "+config.status);
+
+            if (network == null) {
+                makeToast("Unable to connect to the wifi");
+                forgetWifi();
+                return;
             }
+
+            ConnectivityManager.setProcessDefaultNetwork(network);
+
+            promptFileSelect();
 
         } else {
             NetworkSpecifier networkSpecifier = new WifiNetworkSpecifier.Builder()
@@ -90,7 +106,6 @@ public class MainActivity extends AppCompatActivity {
                     .setNetworkSpecifier(networkSpecifier)
                     .build();
 
-            ConnectivityManager connectivityManager = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
             ConnectivityManager.NetworkCallback callback = new ConnectivityManager.NetworkCallback() {
                 @Override
                 public void onAvailable(Network network) {
@@ -129,9 +144,13 @@ public class MainActivity extends AppCompatActivity {
 
                     } catch (IOException e) {
                         e.printStackTrace();
+                    } finally {
+                        forgetWifi();
                     }
                 }).start();
-
+                return;
+            } else {
+                forgetWifi();
             }
         }
         super.onActivityReenter(resultCode, data);
@@ -164,5 +183,28 @@ public class MainActivity extends AppCompatActivity {
                 session.disconnect();
             }
         }
+    }
+
+    private Network getNetwork(ConnectivityManager connectivityManager) {
+        Network[] networks = connectivityManager.getAllNetworks();
+        for (Network network : networks) {
+            NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
+            if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                return network;
+            }
+        }
+
+        return null;
+    }
+
+    private void forgetWifi() {
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        if (networkId != null) {
+            wifiManager.removeNetwork(networkId);
+            wifiManager.disconnect();
+            wifiManager.reconnect();
+            wifiManager.saveConfiguration();
+        }
+        wifiManager.setWifiEnabled(wifiWasEnabled);
     }
 }
