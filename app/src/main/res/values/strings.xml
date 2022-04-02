@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">RaspiCast Manager</string>
+    <string name="too_many_devices_title">Too many devices</string>
+    <string name="too_many_devices_msg">Too many devices were detected on this network. Try disconnecting untargeted devices</string>
 </resources>
