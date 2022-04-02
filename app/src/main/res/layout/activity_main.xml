@@ -4,23 +4,11 @@
     android:layout_height="match_parent"
     android:paddingLeft="10dp"
     android:paddingRight="10dp">
-    <Button
-        android:id="@+id/btnOn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Wifi Turn On" android:layout_marginStart="70dp" android:layout_marginTop="200dp" />
-    <Button
-        android:id="@+id/btnOFF"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBottom="@+id/btnOn"
-        android:layout_toEndOf="@+id/btnOn"
-        android:text="Wifi Turn OFF" />
 
     <Button
-        android:id="@+id/connect"
+        android:id="@+id/sendFileBtn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
-        android:text="Connect" />
+        android:text="Send File" />
 </RelativeLayout>
