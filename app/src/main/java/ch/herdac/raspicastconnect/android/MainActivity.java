@@ -40,15 +40,9 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int FILE_CHOOSER_RETURN_CODE = 1000;
     private static final String SSH_USER = "pi";
-    private static final String SSH_HOST = "RaspiCast";
+    private static final String SSH_HOST = "192.168.42.160";
     private static final int SSH_PORT = 22;
     private static final String SSH_PWD = "hqum#RPI";
-    private final String TAG = "DebugHER";
-    private static WifiP2pManager manager;
-    private static WifiManager wmgr;
-    private static WifiP2pManager.Channel channel;
-    private static BroadcastReceiver receiver;
-    private static IntentFilter intentFilter;
     private static final String wifiSSID = "HERDAC";
     private static final String wifiPWD = "hqum#wifi";
 
@@ -59,47 +53,6 @@ public class MainActivity extends AppCompatActivity {
 
         Button sendFileBtn = findViewById(R.id.sendFileBtn);
         sendFileBtn.setOnClickListener(this::sendFileClick);
-
-        /*
-        manager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
-        channel = manager.initialize(this, getMainLooper(), null);
-        receiver = new WiFiDirectBroadcastReceiver(manager, channel, this);
-
-        intentFilter = new IntentFilter();
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
-
-        boolean initP2pBool = initP2p();
-        Log.i(TAG, "Init P2p: "+ initP2pBool);
-        if (!initP2pBool) {
-            finish();
-        }
-
-        wmgr = (WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        Button btnConnect = findViewById(R.id.sendFileBtn);
-        btntOn.setOnClickListener(v -> {
-            Log.i(TAG, "ON");
-            wmgr.setWifiEnabled(true);
-            Log.i(TAG, "State: " + wmgr.isWifiEnabled());
-        });
-        btntOff.setOnClickListener(v -> {
-            Log.i(TAG, "OFF");
-            wmgr.setWifiEnabled(false);
-            wmgr.disconnect();
-            Log.i(TAG, "State: " + wmgr.isWifiEnabled());
-        });
-
-        btnConnect.setOnClickListener(v -> {
-            Log.i(TAG, "Connect");
-            WifiConfiguration conf = new WifiConfiguration();
-            conf.SSID = "HERDAC";
-            wmgr.addNetwork(conf);
-
-        });*/
-
-
     }
 
     private void sendFileClick(View v) {
@@ -110,7 +63,6 @@ public class MainActivity extends AppCompatActivity {
 
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 makeToast("Permission denied");
-                //ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACC});
                 return;
             }
 
@@ -142,6 +94,7 @@ public class MainActivity extends AppCompatActivity {
             ConnectivityManager.NetworkCallback callback = new ConnectivityManager.NetworkCallback() {
                 @Override
                 public void onAvailable(Network network) {
+                    connectivityManager.bindProcessToNetwork(network);
                     promptFileSelect();
                 }
             };
@@ -150,59 +103,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void promptFileSelect() {
-        //makeToast("Choose file");
         Intent chooseFileIntent = new Intent(Intent.ACTION_GET_CONTENT);
         chooseFileIntent.setType("video/mp4");
         chooseFileIntent.addCategory(Intent.CATEGORY_OPENABLE);
         chooseFileIntent = Intent.createChooser(chooseFileIntent, "Choose a file");
         startActivityForResult(chooseFileIntent, FILE_CHOOSER_RETURN_CODE);
-    }
-
-    private boolean initP2p() {
-        // Device capability definition check
-        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)) {
-            Log.e(TAG, "Wi-Fi Direct is not supported by this device.");
-            return false;
-        }
-
-        // Hardware capability check
-        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        if (wifiManager == null) {
-            Log.e(TAG, "Cannot get Wi-Fi system service.");
-            return false;
-        }
-
-        if (!wifiManager.isP2pSupported()) {
-            Log.e(TAG, "Wi-Fi Direct is not supported by the hardware or Wi-Fi is off.");
-            return false;
-        }
-
-        manager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
-        if (manager == null) {
-            Log.e(TAG, "Cannot get Wi-Fi Direct system service.");
-            return false;
-        }
-
-        channel = manager.initialize(this, getMainLooper(), null);
-        if (channel == null) {
-            Log.e(TAG, "Cannot initialize Wi-Fi Direct.");
-            return false;
-        }
-
-        return true;
-    }
-
-    /* register the broadcast receiver with the intent values to be matched */
-    @Override
-    protected void onResume() {
-        super.onResume();
-        //registerReceiver(receiver, intentFilter);
-    }
-    /* unregister the broadcast receiver */
-    @Override
-    protected void onPause() {
-        super.onPause();
-        //unregisterReceiver(receiver);
     }
 
     private void makeToast(String text) {
@@ -216,16 +121,17 @@ public class MainActivity extends AppCompatActivity {
                 Uri uri = data.getData();
                 Log.i("FileChooser", String.valueOf(uri));
 
-                try {
-                    InputStream inputStream = getContentResolver().openInputStream(uri);
-                    Log.i("FileChooser", String.valueOf(inputStream.available()));
-                    sendSSH(inputStream);
+                new Thread(() -> {
+                    try {
+                        InputStream inputStream = getContentResolver().openInputStream(uri);
+                        Log.i("FileChooser", String.valueOf(inputStream.available()));
+                        sendSSH(inputStream);
 
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                //String filePath = uri.getPath();
-                //Log.i("FileChooser", filePath);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }).start();
+
             }
         }
         super.onActivityReenter(resultCode, data);
@@ -244,8 +150,9 @@ public class MainActivity extends AppCompatActivity {
             channel.connect();
 
             channel.put(inputStream, "/home/pi/video01.mp4");
+            channel.exit();
 
-            makeToast("File sent successfully");
+            runOnUiThread(() -> makeToast("File sent successfully"));
 
         } catch (JSchException | SftpException e) {
             e.printStackTrace();
