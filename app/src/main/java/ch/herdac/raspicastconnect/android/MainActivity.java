@@ -119,7 +119,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (localHostIp == null) { throw new Exception("Local host ip not found"); }
-
+        Log.i("toto", "" + Arrays.toString(localHostIp));
         List<DiscoveredDevice> devices = new ArrayList<>();
         byte[] ip = localHostIp.clone();
         for (int i = 100; i <= 105; i++) {
@@ -371,7 +371,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private static class DiscoveredDevice {
-        private static final int TIMEOUT = 100;
+        private static final int TIMEOUT = 500;
         private String hostIp;
         private String hostName;
 
