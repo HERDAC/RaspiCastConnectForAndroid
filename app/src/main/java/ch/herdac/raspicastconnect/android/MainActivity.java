@@ -1,12 +1,14 @@
 package ch.herdac.raspicastconnect.android;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -18,12 +20,15 @@ import android.net.wifi.WifiManager;
 import android.net.wifi.WifiNetworkSpecifier;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.jcraft.jsch.ChannelSftp;
@@ -84,8 +89,10 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Button sendFileBtn = findViewById(R.id.sendFileBtn);
+        sendFileBtn = findViewById(R.id.sendFileBtn);
         sendFileBtn.setOnClickListener(this::sendFileClick);
+        progressBar = findViewById(R.id.progressBar);
+        progressHint = findViewById(R.id.progressHint);
 
         IntentFilter wifiBroadcastReceiverIntentFilter = new IntentFilter();
         wifiBroadcastReceiverIntentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
@@ -163,6 +170,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendFileClick(View v) {
+        sendFileBtn.setEnabled(false);
+        progressHint.setText(R.string.hint_connecting_wifi);
+
         WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         wifiWasEnabled = wifiManager.isWifiEnabled();
         wifiManager.setWifiEnabled(true);
@@ -227,6 +237,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void promptFileSelect() {
+        runOnUiThread(() -> progressHint.setText(R.string.hint_select_file));
         Intent chooseFileIntent = new Intent(Intent.ACTION_GET_CONTENT);
         chooseFileIntent.setType("video/mp4");
         chooseFileIntent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -238,6 +249,7 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
     }
 
+    @SuppressLint("Range")
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILE_CHOOSER_RETURN_CODE) {
@@ -248,8 +260,13 @@ public class MainActivity extends AppCompatActivity {
                 new Thread(() -> {
                     try {
                         InputStream inputStream = getContentResolver().openInputStream(uri);
+                        Cursor cursor = getContentResolver().query(uri, null, null, null, null);
+                        cursor.moveToFirst();
+                        long size = cursor.getLong(cursor.getColumnIndex(OpenableColumns.SIZE));
+                        cursor.close();
                         Log.i("FileChooser", String.valueOf(inputStream.available()));
-                        sendSSH(inputStream);
+                        Log.i("FileChooser", String.valueOf(size));
+                        sendSSH(inputStream, size);
 
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -265,7 +282,8 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityReenter(resultCode, data);
     }
 
-    private void sendSSH(InputStream inputStream) throws Exception {
+    private void sendSSH(InputStream inputStream, long size) throws Exception {
+        runOnUiThread(() ->  progressHint.setText(R.string.hint_search_device));
         if (reachableDevices == null) {
             discoverDevices();
         }
@@ -295,6 +313,7 @@ public class MainActivity extends AppCompatActivity {
 
         String ssh_host = reachableDevices.get(0).hostIp;
 
+        runOnUiThread(() -> progressHint.setText(R.string.hint_sftp_connect));
         Session session = null;
         ChannelSftp channel = null;
         try {
@@ -306,7 +325,8 @@ public class MainActivity extends AppCompatActivity {
             channel = (ChannelSftp) session.openChannel("sftp");
             channel.connect();
 
-            channel.put(inputStream, "/home/pi/video01.mp4");
+            runOnUiThread(() -> progressHint.setText(R.string.hint_sftp_upload));
+            channel.put(inputStream, "/home/pi/video01.mp4", new SftpUploadProgress(this, inputStream, size));
             channel.exit();
 
             runOnUiThread(() -> makeToast("File sent successfully"));
@@ -344,6 +364,10 @@ public class MainActivity extends AppCompatActivity {
             wifiManager.saveConfiguration();
         }
         wifiManager.setWifiEnabled(wifiWasEnabled);
+        runOnUiThread(() -> {
+            progressHint.setText("");
+            sendFileBtn.setEnabled(true);
+        });
     }
 
     private static class DiscoveredDevice {

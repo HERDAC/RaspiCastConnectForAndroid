@@ -10,5 +10,26 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
-        android:text="Send File" />
+        android:text="@string/send_file_btn" />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="256dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/sendFileBtn"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="20dp"
+        android:progressTint="#689F38"
+        android:scaleY="2"
+        android:visibility="invisible" />
+
+    <TextView
+        android:id="@+id/progressHint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/progressBar"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="0dp" />
+
 </RelativeLayout>
