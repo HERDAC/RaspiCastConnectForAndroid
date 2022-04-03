@@ -58,6 +58,27 @@ public class MainActivity extends AppCompatActivity {
     private WifiBroadcastReceiver wifiBroadcastReceiver;
     private List<DiscoveredDevice> reachableDevices = null;
 
+    private static boolean waitingForWifi = false;
+
+    protected Button sendFileBtn;
+    protected ProgressBar progressBar;
+    protected TextView progressHint;
+
+    public void onWifiConnected(Context context, String ssid) {
+        Log.i("WIFI", "Connected to "+ssid);
+        Log.i("WIFI", ssid+" | "+wifiSSID+" | "+ssid.equals(wifiSSID));
+        if (waitingForWifi && !ssid.equals(wifiSSID)) {
+            runOnUiThread(() -> {
+                AlertDialog dialog = new AlertDialog.Builder(this)
+                        .setTitle(R.string.wrong_wifi_title)
+                        .setMessage(getString(R.string.wrong_wifi_msg, wifiSSID))
+                        .create();
+                dialog.show();
+            });
+        }
+        waitingForWifi = false;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -69,7 +90,7 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter wifiBroadcastReceiverIntentFilter = new IntentFilter();
         wifiBroadcastReceiverIntentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
         wifiBroadcastReceiverIntentFilter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
-        wifiBroadcastReceiver = new WifiBroadcastReceiver();
+        wifiBroadcastReceiver = new WifiBroadcastReceiver(this);
         registerReceiver(wifiBroadcastReceiver, wifiBroadcastReceiverIntentFilter);
     }
 
@@ -95,7 +116,7 @@ public class MainActivity extends AppCompatActivity {
         List<DiscoveredDevice> devices = new ArrayList<>();
         byte[] ip = localHostIp.clone();
         for (int i = 100; i <= 105; i++) {
-            //if (i == localHostIp[3]) { continue; }
+            if (i == localHostIp[3]) { continue; }
             ip[3] = (byte) i;
             devices.add(new DiscoveredDevice(InetAddress.getByAddress(ip).getHostAddress()));
         }
@@ -108,11 +129,11 @@ public class MainActivity extends AppCompatActivity {
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     private List<DiscoveredDevice> discoverParallel(List<DiscoveredDevice> devices) {
-        //System.out.println("Parallel discovery");
+        System.out.println("Parallel discovery");
         return devices.parallelStream().filter(DiscoveredDevice::discover).collect(Collectors.toList());
     }
     private List<DiscoveredDevice> discoverSequential(List<DiscoveredDevice> devices) {
-        //System.out.println("Sequential discovery");
+        System.out.println("Sequential discovery");
         List<DiscoveredDevice> discoveredDevices = new ArrayList<>();
         for (int i = 0; i < devices.size(); i++) {
             DiscoveredDevice device = devices.get(i);
@@ -148,6 +169,7 @@ public class MainActivity extends AppCompatActivity {
 
         ConnectivityManager connectivityManager = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            waitingForWifi = true;
             WifiConfiguration config = new WifiConfiguration();
             config.SSID = wifiSSID;
             config.preSharedKey = "\"" + wifiPWD + "\"";
@@ -255,6 +277,16 @@ public class MainActivity extends AppCompatActivity {
                 AlertDialog dialog = new AlertDialog.Builder(this)
                         .setTitle(R.string.too_many_devices_title)
                         .setMessage(R.string.too_many_devices_msg)
+                        .create();
+                dialog.show();
+            });
+            return;
+        }
+        if (reachableDevices.size() == 0) {
+            runOnUiThread(() ->  {
+                AlertDialog dialog = new AlertDialog.Builder(this)
+                        .setTitle(R.string.no_device_title)
+                        .setMessage(R.string.no_device_msg)
                         .create();
                 dialog.show();
             });

@@ -2,4 +2,14 @@
     <string name="app_name">RaspiCast Manager</string>
     <string name="too_many_devices_title">Too many devices</string>
     <string name="too_many_devices_msg">Too many devices were detected on this network. Try disconnecting untargeted devices</string>
+    <string name="wrong_wifi_title">Connection error</string>
+    <string name="wrong_wifi_msg">The connection to the right network couldn\'t be established. Please manually connect to \'%s\'</string>
+    <string name="send_file_btn">Send File</string>
+    <string name="hint_connecting_wifi">Connecting to wifi</string>
+    <string name="hint_select_file">Selecting file</string>
+    <string name="hint_search_device">Searching device</string>
+    <string name="hint_sftp_connect">SFTP connection</string>
+    <string name="no_device_title">Device not found</string>
+    <string name="no_device_msg">No device was found on this network. Try again</string>
+    <string name="hint_sftp_upload">Uploading file</string>
 </resources>

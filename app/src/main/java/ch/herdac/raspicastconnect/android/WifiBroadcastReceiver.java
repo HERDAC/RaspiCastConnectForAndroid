@@ -9,6 +9,10 @@ import android.net.wifi.WifiManager;
 import android.util.Log;
 
 public class WifiBroadcastReceiver extends BroadcastReceiver {
+    private final MainActivity main;
+    public WifiBroadcastReceiver(MainActivity main) {
+        this.main = main;
+    }
     @Override
     public void onReceive(Context context, Intent intent) {
         Log.i("WFBR", "Received: "+intent.getAction());
@@ -24,8 +28,9 @@ public class WifiBroadcastReceiver extends BroadcastReceiver {
             if (wifiInfo == null || wifiInfo.getSSID() == null) {
                 Log.i("WFBR", "Uninteresting");
             } else {
-                String ssid = wifiInfo.getSSID();
+                String ssid = wifiInfo.getSSID().replaceAll("^\"|\"$","");
                 Log.i("WFBR", "SSID: "+ssid);
+                main.onWifiConnected(context, ssid);
             }
         }
     }
